@@ -210,4 +210,11 @@ with col2:
 # FOOTER
 # ---------------------------------------------------------
 st.divider()
-st.caption("Built with Streamlit · Model: Logistic Regression · For demonstration purposes")
+st.markdown(
+    "<p style='text-align:center; color:gray; font-size:0.85rem;'>"
+    "Built by <b>Your Name</b> · "
+    "<a href='https://linkedin.com/in/yourprofile' target='_blank'>LinkedIn</a> · "
+    "<a href='https://github.com/yourusername' target='_blank'>GitHub</a>"
+    "</p>",
+    unsafe_allow_html=True
+)
