@@ -63,7 +63,7 @@ st.markdown("""
 # ---------------------------------------------------------
 @st.cache_resource
 def load_artifacts():
-    model = joblib.load("churn_model.pkl")
+    model = joblib.load("logistic_churn.pkl")
     scaler = joblib.load("scaler.pkl")
     model_columns = joblib.load("model_columns.pkl")
     return model, scaler, model_columns
