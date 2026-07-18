@@ -3,16 +3,15 @@ import pandas as pd
 import numpy as np
 import joblib
 import plotly.graph_objects as go
-import os
-from PIL import Image
+
 
 # ---------------------------------------------------------
 # PAGE CONFIG (must be the first Streamlit command)
 # ---------------------------------------------------------
-page_icon = Image.open("house_icon.png") if os.path.exists("house_icon.png") else "🏠"
+
 st.set_page_config(
     page_title="Customer Churn Predictor",
-    page_icon=page_icon,
+    page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
