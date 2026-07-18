@@ -2,25 +2,23 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
+import plotly.graph_objects as go
 
 # ---------------------------------------------------------
 # PAGE CONFIG (must be the first Streamlit command)
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="Customer Churn Predictor",
-    page_icon="📊",
+    page_icon="🏠",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # ---------------------------------------------------------
-# CUSTOM STYLING
+# CUSTOM STYLING (theme-aware — no hardcoded light backgrounds)
 # ---------------------------------------------------------
 st.markdown("""
     <style>
-        .main {
-            background-color: #f7f9fc;
-        }
         .stButton>button {
             width: 100%;
             background-color: #4F46E5;
@@ -40,20 +38,14 @@ st.markdown("""
             border-radius: 12px;
             text-align: center;
             margin-top: 1rem;
+            border: 1px solid rgba(250,250,250,0.15);
+            background-color: rgba(250,250,250,0.04);
         }
         .churn-risk {
-            background-color: #FEF2F2;
-            border: 1px solid #FCA5A5;
+            border-left: 4px solid #EF4444;
         }
         .no-churn-risk {
-            background-color: #F0FDF4;
-            border: 1px solid #86EFAC;
-        }
-        .metric-box {
-            background-color: white;
-            padding: 1rem;
-            border-radius: 10px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            border-left: 4px solid #22C55E;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -72,7 +64,7 @@ try:
     model, scaler, model_columns = load_artifacts()
 except FileNotFoundError:
     st.error(
-        "Model files not found. Make sure churn_model.pkl, scaler.pkl, "
+        "Model files not found. Make sure logistic_churn.pkl, scaler.pkl, "
         "and model_columns.pkl are in the same folder as app.py."
     )
     st.stop()
@@ -86,6 +78,15 @@ st.markdown(
     "and account details. Fill in the customer information in the sidebar, "
     "then click **Predict**."
 )
+
+with st.expander("ℹ️ About this model"):
+    st.markdown(
+        "This app uses a **Logistic Regression** model trained on customer "
+        "account and service data to estimate churn probability. Adjust the "
+        "decision threshold to control sensitivity — lower values flag more "
+        "customers as at-risk (more false alarms), higher values are stricter."
+    )
+
 st.divider()
 
 # ---------------------------------------------------------
@@ -94,10 +95,13 @@ st.divider()
 st.sidebar.header("Customer Details")
 
 def user_input_form():
-    gender = st.sidebar.selectbox("Gender", ["Male", "Female"])
-    senior_citizen = st.sidebar.selectbox("Senior Citizen", ["No", "Yes"])
-    partner = st.sidebar.selectbox("Has Partner", ["No", "Yes"])
-    dependents = st.sidebar.selectbox("Has Dependents", ["No", "Yes"])
+    c1, c2 = st.sidebar.columns(2)
+    with c1:
+        gender = st.selectbox("Gender", ["Male", "Female"])
+        partner = st.selectbox("Has Partner", ["No", "Yes"])
+    with c2:
+        senior_citizen = st.selectbox("Senior Citizen", ["No", "Yes"])
+        dependents = st.selectbox("Has Dependents", ["No", "Yes"])
 
     st.sidebar.markdown("---")
     tenure = st.sidebar.slider("Tenure (months)", 0, 72, 12)
@@ -143,11 +147,9 @@ input_df = user_input_form()
 # ---------------------------------------------------------
 def preprocess(input_df, model_columns):
     df_encoded = pd.get_dummies(input_df)
-    # Add any missing columns the model expects, fill with 0
     for col in model_columns:
         if col not in df_encoded.columns:
             df_encoded[col] = 0
-    # Keep only the columns the model was trained on, in the right order
     df_encoded = df_encoded[model_columns]
     return df_encoded
 
@@ -158,15 +160,15 @@ col1, col2 = st.columns([1, 1])
 
 with col1:
     st.subheader("Customer Summary")
-    st.markdown(f"""
-    <div class="metric-box">
-        <b>Tenure:</b> {input_df['tenure'].values[0]} months<br>
-        <b>Contract:</b> {input_df['Contract'].values[0]}<br>
-        <b>Monthly Charges:</b> ${input_df['MonthlyCharges'].values[0]:.2f}<br>
-        <b>Total Charges:</b> ${input_df['TotalCharges'].values[0]:.2f}<br>
-        <b>Internet Service:</b> {input_df['InternetService'].values[0]}
-    </div>
-    """, unsafe_allow_html=True)
+    with st.container(border=True):
+        m1, m2 = st.columns(2)
+        with m1:
+            st.metric("Tenure", f"{input_df['tenure'].values[0]} months")
+            st.metric("Monthly Charges", f"${input_df['MonthlyCharges'].values[0]:.2f}")
+        with m2:
+            st.metric("Contract", input_df['Contract'].values[0])
+            st.metric("Total Charges", f"${input_df['TotalCharges'].values[0]:.2f}")
+        st.caption(f"🌐 Internet Service: **{input_df['InternetService'].values[0]}**")
 
 with col2:
     st.subheader("Prediction")
@@ -183,11 +185,42 @@ with col2:
         probability = model.predict_proba(scaled_input)[0][1]
         prediction = 1 if probability >= threshold else 0
 
+        # --- Gauge chart ---
+        gauge_color = "#EF4444" if prediction == 1 else "#22C55E"
+        fig = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=probability * 100,
+            number={'suffix': "%", 'font': {'color': 'white', 'size': 36}},
+            gauge={
+                'axis': {'range': [0, 100], 'tickcolor': 'white'},
+                'bar': {'color': gauge_color},
+                'bgcolor': "rgba(0,0,0,0)",
+                'borderwidth': 0,
+                'steps': [
+                    {'range': [0, threshold * 100], 'color': "rgba(34,197,94,0.15)"},
+                    {'range': [threshold * 100, 100], 'color': "rgba(239,68,68,0.15)"},
+                ],
+                'threshold': {
+                    'line': {'color': "white", 'width': 2},
+                    'thickness': 0.8,
+                    'value': threshold * 100
+                }
+            }
+        ))
+        fig.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            font_color="white",
+            height=250,
+            margin=dict(l=20, r=20, t=30, b=10)
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+        # --- Result card ---
         if prediction == 1:
             st.markdown(f"""
             <div class="result-card churn-risk">
                 <h3>⚠️ High Churn Risk</h3>
-                <p style="font-size:1.5rem; font-weight:700; color:#DC2626;">
+                <p style="font-size:1.4rem; font-weight:700; color:#F87171;">
                     {probability*100:.1f}% probability
                 </p>
                 <p>This customer is likely to churn. Consider a retention offer.</p>
@@ -197,14 +230,12 @@ with col2:
             st.markdown(f"""
             <div class="result-card no-churn-risk">
                 <h3>✅ Low Churn Risk</h3>
-                <p style="font-size:1.5rem; font-weight:700; color:#16A34A;">
+                <p style="font-size:1.4rem; font-weight:700; color:#4ADE80;">
                     {probability*100:.1f}% probability
                 </p>
                 <p>This customer is likely to stay.</p>
             </div>
             """, unsafe_allow_html=True)
-
-        st.progress(min(int(probability * 100), 100))
 
 # ---------------------------------------------------------
 # FOOTER
@@ -213,7 +244,7 @@ st.divider()
 st.markdown(
     "<p style='text-align:center; color:gray; font-size:0.85rem;'>"
     "Built by <b>Tanzila Sharif</b> · "
-    "<a href='https://linkedin.com/in/tanzilasharif' target='_blank'>LinkedIn</a> · "
+    "<a href='https://linkedin.com/in/tanzilasharif' target='_blank'>LinkedIn</a>"
     "</p>",
     unsafe_allow_html=True
 )
