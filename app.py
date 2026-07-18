@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 # PAGE CONFIG (must be the first Streamlit command)
 # ---------------------------------------------------------
 st.set_page_config(
-    page_title="🏠 Customer Churn Predictor",
+    page_title="Customer Churn Predictor",
     page_icon="🏠",
     layout="wide",
     initial_sidebar_state="expanded"
